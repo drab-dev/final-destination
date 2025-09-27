@@ -3,10 +3,11 @@ import React, { useState } from "react";
 
 import { isExcalidrawPlusSignedUser } from "../app_constants";
 
+import { supabase } from "../lib/supabaseClient";
+
 import { DebugFooter, isVisualDebuggerEnabled } from "./DebugCanvas";
 import { EncryptedIcon } from "./EncryptedIcon";
 import { ExcalidrawPlusAppLink } from "./ExcalidrawPlusAppLink";
-import { supabase } from "../lib/supabaseClient";
 
 export const AppFooter = React.memo(
   ({ onChange }: { onChange: () => void }) => {
@@ -38,7 +39,9 @@ export const AppFooter = React.memo(
 
 const SignOutButton = () => {
   const [loading, setLoading] = useState(false);
-  if (!supabase) return null;
+  if (!supabase) {
+    return null;
+  }
   const client = supabase; // narrowed
   const onClick = async () => {
     setLoading(true);

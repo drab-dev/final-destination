@@ -107,7 +107,12 @@ import { TopErrorBoundary } from "./components/TopErrorBoundary";
 import Login from "./components/Login";
 import LogoutButton from "./components/LogoutButton";
 import { supabase } from "./lib/supabaseClient";
-import type { Session, AuthChangeEvent, SupabaseClient } from "@supabase/supabase-js";
+
+import type {
+  Session,
+  AuthChangeEvent,
+  SupabaseClient,
+} from "@supabase/supabase-js";
 
 import {
   exportToBackend,
@@ -141,11 +146,15 @@ import DebugCanvas, {
 } from "./components/DebugCanvas";
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
+import { loadBackup, saveBackup } from "./lib/backupService";
+import { BackupStatus } from "./components/BackupStatus";
+import "./lib/diagnostics"; // Show diagnostic info
+import "./lib/ensureTable"; // Ensure database table exists
+import "./lib/testBackup"; // This will auto-run the backup system test
 
 import "./index.scss";
 
 import type { CollabAPI } from "./collab/Collab";
-
 
 polyfill();
 
@@ -342,8 +351,12 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
-const ExcalidrawWrapper = () => {
+const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
   const [errorMessage, setErrorMessage] = useState("");
+  const [backupLoaded, setBackupLoaded] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [lastBackupSave, setLastBackupSave] = useState<Date | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
   const isCollabDisabled = isRunningInIframe();
 
   const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
@@ -404,6 +417,109 @@ const ExcalidrawWrapper = () => {
       forceRefresh((prev) => !prev);
     }
   }, [excalidrawAPI]);
+
+  // Load backup data when user logs in
+  useEffect(() => {
+    const loadUserBackup = async () => {
+      console.log("🔄 useEffect loadUserBackup triggered", {
+        userId: session?.user?.id,
+        hasExcalidrawAPI: !!excalidrawAPI,
+        backupLoaded,
+        backupLoading,
+      });
+
+      if (
+        session?.user?.id &&
+        excalidrawAPI &&
+        !backupLoaded &&
+        !backupLoading
+      ) {
+        setBackupLoading(true);
+        console.log("🔄 Loading backup for user:", session.user.id);
+        try {
+          const backupData = await loadBackup(session.user.id);
+          if (backupData) {
+            console.log("✅ Backup data found, updating scene");
+            // Update the scene with backup data
+            excalidrawAPI.updateScene({
+              elements: backupData.elements || [],
+              appState:
+                (backupData.appState as Pick<
+                  AppState,
+                  keyof AppState
+                > | null) || null,
+              captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+            });
+            // Add files if they exist
+            if (backupData.files) {
+              excalidrawAPI.addFiles(Object.values(backupData.files));
+            }
+          } else {
+            console.log("ℹ️ No backup data found for user");
+          }
+        } catch (error) {
+          console.error("❌ Error loading backup:", error);
+          setBackupError(
+            "Failed to load your saved drawing. Please refresh the page.",
+          );
+          setErrorMessage(
+            "Failed to load your saved drawing. Please refresh the page.",
+          );
+        } finally {
+          setBackupLoaded(true);
+          setBackupLoading(false);
+        }
+      }
+    };
+
+    loadUserBackup();
+  }, [session?.user?.id, excalidrawAPI, backupLoaded, backupLoading]);
+
+  // Create debounced backup save function
+  const debouncedSaveBackup = useCallback(
+    debounce(
+      async (
+        elements: readonly OrderedExcalidrawElement[],
+        appState: AppState,
+        files: BinaryFiles,
+      ) => {
+        console.log("💾 debouncedSaveBackup triggered", {
+          userId: session?.user?.id,
+          backupLoaded,
+          elementsCount: elements.length,
+        });
+
+        if (session?.user?.id && backupLoaded) {
+          try {
+            // Save only elements as specifically requested
+            const backupData: ExcalidrawInitialDataState = {
+              elements,
+            };
+            console.log("💾 Calling saveBackup...");
+            const success = await saveBackup(session.user.id, backupData);
+            if (success) {
+              console.log("✅ Backup save successful");
+              setLastBackupSave(new Date());
+              setBackupError(null);
+            } else {
+              console.log("❌ Backup save failed");
+              setBackupError("Failed to save backup");
+            }
+          } catch (error) {
+            console.error("❌ Failed to save backup:", error);
+            setBackupError("Failed to save backup");
+          }
+        } else {
+          console.log("⚠️ Skipping backup save:", {
+            hasUserId: !!session?.user?.id,
+            backupLoaded,
+          });
+        }
+      },
+      2000,
+    ), // Save backup every 2 seconds after user stops drawing
+    [session?.user?.id, backupLoaded],
+  );
 
   useEffect(() => {
     if (!excalidrawAPI || (!isCollabDisabled && !collabAPI)) {
@@ -665,6 +781,10 @@ const ExcalidrawWrapper = () => {
         }
       });
     }
+
+    // Save backup to database when user makes changes
+    console.log("🔄 onChange called, triggering debouncedSaveBackup");
+    debouncedSaveBackup(elements, appState, files);
 
     // Render the debug scene if the debug canvas is available
     if (debugCanvasRef.current && excalidrawAPI) {
@@ -1178,6 +1298,15 @@ const ExcalidrawWrapper = () => {
           />
         )}
       </Excalidraw>
+
+      {/* Backup Status Indicator */}
+      {session?.user && (
+        <BackupStatus
+          isLoading={backupLoading}
+          lastSaved={lastBackupSave}
+          error={backupError}
+        />
+      )}
     </div>
   );
 };
@@ -1187,7 +1316,9 @@ const ExcalidrawApp = () => {
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    if (!supabase) return; // no-op if not configured
+    if (!supabase) {
+      return;
+    } // no-op if not configured
     const client: SupabaseClient = supabase; // narrowed
     (async () => {
       const { data } = await client.auth.getSession();
@@ -1216,7 +1347,7 @@ const ExcalidrawApp = () => {
   return (
     <TopErrorBoundary>
       <Provider store={appJotaiStore}>
-        <ExcalidrawWrapper />
+        <ExcalidrawWrapper session={session} />
         <LogoutButton />
       </Provider>
     </TopErrorBoundary>

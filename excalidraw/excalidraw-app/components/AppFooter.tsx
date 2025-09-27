@@ -6,7 +6,6 @@ import { Footer } from "@excalidraw/excalidraw/index";
 import { isExcalidrawPlusSignedUser } from "../app_constants";
 
 import { supabase } from "../lib/supabaseClient";
-import { supabase } from "../lib/supabaseClient";
 
 // Local components
 import { DebugFooter, isVisualDebuggerEnabled } from "./DebugCanvas";

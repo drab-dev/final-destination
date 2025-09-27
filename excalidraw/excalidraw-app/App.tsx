@@ -110,12 +110,6 @@ import Login from "./components/Login";
 import LogoutButton from "./components/LogoutButton";
 import { supabase } from "./lib/supabaseClient";
 
-import type {
-  Session,
-  AuthChangeEvent,
-  SupabaseClient,
-} from "@supabase/supabase-js";
-
 import {
   exportToBackend,
   getCollaborationLinkData,

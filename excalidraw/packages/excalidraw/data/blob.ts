@@ -465,13 +465,19 @@ export const createFile = (
  * Note: doesn't handle missing .kroolo/.kroololib extension  */
 export const normalizeFile = async (file: File) => {
   if (!file.type) {
-    if (file?.name?.endsWith(".kroololib") || file?.name?.endsWith(".excalidrawlib")) {
+    if (
+      file?.name?.endsWith(".kroololib") ||
+      file?.name?.endsWith(".excalidrawlib")
+    ) {
       file = createFile(
         await blobToArrayBuffer(file),
         MIME_TYPES.excalidrawlib,
         file.name,
       );
-    } else if (file?.name?.endsWith(".kroolo") || file?.name?.endsWith(".excalidraw")) {
+    } else if (
+      file?.name?.endsWith(".kroolo") ||
+      file?.name?.endsWith(".excalidraw")
+    ) {
       file = createFile(
         await blobToArrayBuffer(file),
         MIME_TYPES.excalidraw,

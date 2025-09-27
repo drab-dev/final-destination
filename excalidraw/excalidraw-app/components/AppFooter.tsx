@@ -1,10 +1,13 @@
-import { Footer } from "@excalidraw/excalidraw/index";
+// External / framework
 import React, { useState } from "react";
+import { Footer } from "@excalidraw/excalidraw/index";
 
+// Internal shared (constants, clients)
 import { isExcalidrawPlusSignedUser } from "../app_constants";
 
 import { supabase } from "../lib/supabaseClient";
 
+// Local components
 import { DebugFooter, isVisualDebuggerEnabled } from "./DebugCanvas";
 import { EncryptedIcon } from "./EncryptedIcon";
 import { ExcalidrawPlusAppLink } from "./ExcalidrawPlusAppLink";
@@ -39,6 +42,9 @@ export const AppFooter = React.memo(
 
 const SignOutButton = () => {
   const [loading, setLoading] = useState(false);
+  if (!supabase) {
+    return null;
+  }
   if (!supabase) {
     return null;
   }

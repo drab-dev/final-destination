@@ -1,10 +1,13 @@
-import {
-  Excalidraw,
-  LiveCollaborationTrigger,
-  TTDDialogTrigger,
-  CaptureUpdateAction,
-  reconcileElements,
-} from "@excalidraw/excalidraw";
+// React / framework imports
+import { useCallback, useEffect, useRef, useState } from "react";
+
+// External libraries (runtime first, then types)
+import clsx from "clsx";
+// (type imports moved below, after local imports per ordering rules)
+
+// Excalidraw / internal shared packages (runtime then types)
+// prettier-ignore
+import { Excalidraw, LiveCollaborationTrigger, TTDDialogTrigger, CaptureUpdateAction, reconcileElements } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
@@ -35,7 +38,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { useCallbackRefState } from "@excalidraw/excalidraw/hooks/useCallbackRefState";
 import { t } from "@excalidraw/excalidraw/i18n";
-
 import {
   GithubIcon,
   XBrandIcon,
@@ -49,7 +51,7 @@ import { isElementLink } from "@excalidraw/element";
 import { restore, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 import { newElementWith } from "@excalidraw/element";
 import { isInitializedImageElement } from "@excalidraw/element";
-import clsx from "clsx";
+
 import {
   parseLibraryTokensFromUrl,
   useHandleLibrary,
@@ -72,6 +74,7 @@ import type {
 import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
+// Local components (runtime then local types)
 import CustomStats from "./CustomStats";
 import {
   Provider,
@@ -109,13 +112,11 @@ import {
   isCollaborationLink,
   loadScene,
 } from "./data";
-
 import { updateStaleImageStatuses } from "./data/FileManager";
 import {
   importFromLocalStorage,
   importUsernameFromLocalStorage,
 } from "./data/localStorage";
-
 import { loadFilesFromFirebase } from "./data/firebase";
 import {
   LibraryIndexedDBAdapter,
@@ -141,6 +142,9 @@ import "./lib/diagnostics"; // Show diagnostic info
 import "./lib/ensureTable"; // Ensure database table exists
 import "./lib/testBackup"; // This will auto-run the backup system test
 
+// Local types (including external type-only imports that must come after local runtime imports)
+// prettier-ignore
+// Styles (must come before external type-only imports to satisfy import/order)
 import "./index.scss";
 
 import type {

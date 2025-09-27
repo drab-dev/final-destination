@@ -10540,7 +10540,9 @@ class App extends React.Component<AppProps, AppState> {
       return this.insertImages(imageFiles, sceneX, sceneY);
     }
 
-    const libraryJSON = dataTransferList.getData(MIME_TYPES.kroololib) || dataTransferList.getData("application/vnd.excalidrawlib+json" as any);
+    const libraryJSON =
+      dataTransferList.getData(MIME_TYPES.kroololib) ||
+      dataTransferList.getData("application/vnd.excalidrawlib+json" as any);
     if (libraryJSON && typeof libraryJSON === "string") {
       try {
         const libraryItems = parseLibraryJSON(libraryJSON);

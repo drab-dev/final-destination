@@ -10,12 +10,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
   | string
   | undefined;
 
-console.log("🔧 Supabase config check:", {
-  hasUrl: !!supabaseUrl,
-  hasKey: !!supabaseAnonKey,
-  url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : "undefined",
-});
-
 if (!supabaseUrl || !supabaseAnonKey) {
   // We don't throw to avoid hard crashing the whole app build/runtime.
   // Instead, log a clear warning so auth UI can present a message.
@@ -28,21 +22,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase: SupabaseClient | undefined =
   supabaseUrl && supabaseAnonKey
-    ? (() => {
-        console.log("✅ Creating Supabase client...");
-        const client = createClient(supabaseUrl, supabaseAnonKey, {
-          auth: {
-            autoRefreshToken: true,
-            persistSession: true,
-            detectSessionInUrl: true,
-          },
-        });
-        console.log("✅ Supabase client created successfully");
-        return client;
-      })()
-    : (() => {
-        console.log("❌ Supabase client not created - missing credentials");
-        return undefined;
-      })();
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : undefined;
 
 export type SupabaseClientType = SupabaseClient | undefined;

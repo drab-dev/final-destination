@@ -12,19 +12,13 @@ export interface BackupData {
 export const loadBackup = async (
   userId: string,
 ): Promise<ExcalidrawInitialDataState | null> => {
-  console.log("🔍 loadBackup called with userId:", userId);
-  console.log("🔍 Supabase client available:", !!supabase);
+  // Debug logging removed for production
 
   if (!supabase || !userId) {
-    console.warn("❌ Supabase client not available or no user ID provided", {
-      supabase: !!supabase,
-      userId,
-    });
     return null;
   }
 
   try {
-    console.log("🔄 Attempting to load backup from database...");
     // Get the most recent backup for the user
     const { data, error } = await supabase
       .from("backups")
@@ -34,12 +28,9 @@ export const loadBackup = async (
       .limit(1)
       .single();
 
-    console.log("📊 Database response:", { data: !!data, error });
-
     if (error) {
       if (error.code === "PGRST116") {
         // No backup found - this is fine for new users
-        console.log("ℹ️ No backup found for user:", userId);
         return null;
       }
       if (error.code === "42P01") {
@@ -54,11 +45,9 @@ export const loadBackup = async (
     }
 
     if (data?.data) {
-      console.log("✅ Backup loaded successfully for user:", userId);
       return data.data as ExcalidrawInitialDataState;
     }
 
-    console.log("ℹ️ No backup data found");
     return null;
   } catch (error) {
     console.error("Unexpected error loading backup:", error);
@@ -70,29 +59,16 @@ export const saveBackup = async (
   userId: string,
   drawingData: ExcalidrawInitialDataState,
 ): Promise<boolean> => {
-  console.log("💾 saveBackup called with userId:", userId);
-  console.log(
-    "💾 Drawing data elements count:",
-    drawingData.elements?.length || 0,
-  );
-  console.log("💾 Supabase client available:", !!supabase);
-
   if (!supabase || !userId) {
-    console.warn("❌ Supabase client not available or no user ID provided", {
-      supabase: !!supabase,
-      userId,
-    });
     return false;
   }
 
   try {
-    console.log("🔄 Attempting to save backup to database...");
-
     // Delete any existing backups for this user, then insert new one
     // This ensures we only keep the latest backup per user
     await supabase.from("backups").delete().eq("user_id", userId);
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("backups")
       .insert({
         user_id: userId,
@@ -100,8 +76,6 @@ export const saveBackup = async (
         updated_at: new Date().toISOString(),
       })
       .select();
-
-    console.log("📊 Save response:", { data, error });
 
     if (error) {
       if (error.code === "42P01") {
@@ -115,7 +89,6 @@ export const saveBackup = async (
       return false;
     }
 
-    console.log("✅ Backup saved successfully for user:", userId);
     return true;
   } catch (error) {
     console.error("Unexpected error saving backup:", error);

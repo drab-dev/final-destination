@@ -31,7 +31,7 @@ import {
   isDevEnv,
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { useCallbackRefState } from "@excalidraw/excalidraw/hooks/useCallbackRefState";
 import { t } from "@excalidraw/excalidraw/i18n";
@@ -42,7 +42,6 @@ import {
   DiscordIcon,
   ExcalLogo,
   usersIcon,
-  exportToPlus,
   share,
   youtubeIcon,
 } from "@excalidraw/excalidraw/components/icons";
@@ -99,20 +98,10 @@ import { VersionDropdown } from "./components/versioning/VersionDropdown";
 import { VersionToast } from "./components/versioning/VersionToast";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
-import {
-  ExportToExcalidrawPlus,
-  exportToExcalidrawPlus,
-} from "./components/ExportToExcalidrawPlus";
 import { TopErrorBoundary } from "./components/TopErrorBoundary";
 import Login from "./components/Login";
 import LogoutButton from "./components/LogoutButton";
 import { supabase } from "./lib/supabaseClient";
-
-import type {
-  Session,
-  AuthChangeEvent,
-  SupabaseClient,
-} from "@supabase/supabase-js";
 
 import {
   exportToBackend,
@@ -153,6 +142,12 @@ import "./lib/ensureTable"; // Ensure database table exists
 import "./lib/testBackup"; // This will auto-run the backup system test
 
 import "./index.scss";
+
+import type {
+  Session,
+  AuthChangeEvent,
+  SupabaseClient,
+} from "@supabase/supabase-js";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -421,13 +416,6 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
   // Load backup data when user logs in
   useEffect(() => {
     const loadUserBackup = async () => {
-      console.log("🔄 useEffect loadUserBackup triggered", {
-        userId: session?.user?.id,
-        hasExcalidrawAPI: !!excalidrawAPI,
-        backupLoaded,
-        backupLoading,
-      });
-
       if (
         session?.user?.id &&
         excalidrawAPI &&
@@ -435,11 +423,9 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
         !backupLoading
       ) {
         setBackupLoading(true);
-        console.log("🔄 Loading backup for user:", session.user.id);
         try {
           const backupData = await loadBackup(session.user.id);
           if (backupData) {
-            console.log("✅ Backup data found, updating scene");
             // Update the scene with backup data
             excalidrawAPI.updateScene({
               elements: backupData.elements || [],
@@ -454,8 +440,6 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
             if (backupData.files) {
               excalidrawAPI.addFiles(Object.values(backupData.files));
             }
-          } else {
-            console.log("ℹ️ No backup data found for user");
           }
         } catch (error) {
           console.error("❌ Error loading backup:", error);
@@ -476,49 +460,37 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
   }, [session?.user?.id, excalidrawAPI, backupLoaded, backupLoading]);
 
   // Create debounced backup save function
-  const debouncedSaveBackup = useCallback(
-    debounce(
-      async (
-        elements: readonly OrderedExcalidrawElement[],
-        appState: AppState,
-        files: BinaryFiles,
-      ) => {
-        console.log("💾 debouncedSaveBackup triggered", {
-          userId: session?.user?.id,
-          backupLoaded,
-          elementsCount: elements.length,
-        });
-
-        if (session?.user?.id && backupLoaded) {
-          try {
-            // Save only elements as specifically requested
-            const backupData: ExcalidrawInitialDataState = {
-              elements,
-            };
-            console.log("💾 Calling saveBackup...");
-            const success = await saveBackup(session.user.id, backupData);
-            if (success) {
-              console.log("✅ Backup save successful");
-              setLastBackupSave(new Date());
-              setBackupError(null);
-            } else {
-              console.log("❌ Backup save failed");
-              setBackupError("Failed to save backup");
-            }
-          } catch (error) {
-            console.error("❌ Failed to save backup:", error);
+  const saveBackupFn = useCallback(
+    async (
+      elements: readonly OrderedExcalidrawElement[],
+      appState: AppState,
+      files: BinaryFiles,
+    ) => {
+      if (session?.user?.id && backupLoaded) {
+        try {
+          // Save only elements as specifically requested
+          const backupData: ExcalidrawInitialDataState = {
+            elements,
+          };
+          const success = await saveBackup(session.user.id, backupData);
+          if (success) {
+            setLastBackupSave(new Date());
+            setBackupError(null);
+          } else {
             setBackupError("Failed to save backup");
           }
-        } else {
-          console.log("⚠️ Skipping backup save:", {
-            hasUserId: !!session?.user?.id,
-            backupLoaded,
-          });
+        } catch (error) {
+          console.error("❌ Failed to save backup:", error);
+          setBackupError("Failed to save backup");
         }
-      },
-      2000,
-    ), // Save backup every 2 seconds after user stops drawing
+      }
+    },
     [session?.user?.id, backupLoaded],
+  );
+
+  const debouncedSaveBackup = useMemo(
+    () => debounce(saveBackupFn, 2000), // Save backup every 2 seconds after user stops drawing
+    [saveBackupFn],
   );
 
   useEffect(() => {
@@ -783,7 +755,6 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
     }
 
     // Save backup to database when user makes changes
-    console.log("🔄 onChange called, triggering debouncedSaveBackup");
     debouncedSaveBackup(elements, appState, files);
 
     // Render the debug scene if the debug canvas is available
@@ -946,30 +917,7 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
             toggleTheme: true,
             export: {
               onExportToBackend,
-              renderCustomUI: excalidrawAPI
-                ? (elements, appState, files) => {
-                    return (
-                      <ExportToExcalidrawPlus
-                        elements={elements}
-                        appState={appState}
-                        files={files}
-                        name={excalidrawAPI.getName()}
-                        onError={(error) => {
-                          excalidrawAPI?.updateScene({
-                            appState: {
-                              errorMessage: error.message,
-                            },
-                          });
-                        }}
-                        onSuccess={() => {
-                          excalidrawAPI.updateScene({
-                            appState: { openDialog: null },
-                          });
-                        }}
-                      />
-                    );
-                  }
-                : undefined,
+              // renderCustomUI removed - no longer showing Excalidraw+ option
             },
           },
         }}
@@ -1035,22 +983,6 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
         <OverwriteConfirmDialog>
           <OverwriteConfirmDialog.Actions.ExportToImage />
           <OverwriteConfirmDialog.Actions.SaveToDisk />
-          {excalidrawAPI && (
-            <OverwriteConfirmDialog.Action
-              title={t("overwriteConfirm.action.excalidrawPlus.title")}
-              actionLabel={t("overwriteConfirm.action.excalidrawPlus.button")}
-              onClick={() => {
-                exportToExcalidrawPlus(
-                  excalidrawAPI.getSceneElements(),
-                  excalidrawAPI.getAppState(),
-                  excalidrawAPI.getFiles(),
-                  excalidrawAPI.getName(),
-                );
-              }}
-            >
-              {t("overwriteConfirm.action.excalidrawPlus.description")}
-            </OverwriteConfirmDialog.Action>
-          )}
         </OverwriteConfirmDialog>
         <AppFooter onChange={() => excalidrawAPI?.refresh()} />
         {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
@@ -1242,23 +1174,6 @@ const ExcalidrawWrapper = ({ session }: { session: Session | null }) => {
                 ]
               : [ExcalidrawPlusCommand, ExcalidrawPlusAppCommand]),
 
-            {
-              label: t("overwriteConfirm.action.excalidrawPlus.button"),
-              category: DEFAULT_CATEGORIES.export,
-              icon: exportToPlus,
-              predicate: true,
-              keywords: ["plus", "export", "save", "backup"],
-              perform: () => {
-                if (excalidrawAPI) {
-                  exportToExcalidrawPlus(
-                    excalidrawAPI.getSceneElements(),
-                    excalidrawAPI.getAppState(),
-                    excalidrawAPI.getFiles(),
-                    excalidrawAPI.getName(),
-                  );
-                }
-              },
-            },
             {
               ...CommandPalette.defaultItems.toggleTheme,
               perform: () => {

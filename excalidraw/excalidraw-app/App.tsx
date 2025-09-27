@@ -1,10 +1,13 @@
-import {
-  Excalidraw,
-  LiveCollaborationTrigger,
-  TTDDialogTrigger,
-  CaptureUpdateAction,
-  reconcileElements,
-} from "@excalidraw/excalidraw";
+// React / framework imports
+import { useCallback, useEffect, useRef, useState } from "react";
+
+// External libraries (runtime first, then types)
+import clsx from "clsx";
+// (type imports moved below, after local imports per ordering rules)
+
+// Excalidraw / internal shared packages (runtime then types)
+// prettier-ignore
+import { Excalidraw, LiveCollaborationTrigger, TTDDialogTrigger, CaptureUpdateAction, reconcileElements } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
@@ -31,11 +34,9 @@ import {
   isDevEnv,
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { useCallbackRefState } from "@excalidraw/excalidraw/hooks/useCallbackRefState";
 import { t } from "@excalidraw/excalidraw/i18n";
-
 import {
   GithubIcon,
   XBrandIcon,
@@ -50,7 +51,7 @@ import { isElementLink } from "@excalidraw/element";
 import { restore, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 import { newElementWith } from "@excalidraw/element";
 import { isInitializedImageElement } from "@excalidraw/element";
-import clsx from "clsx";
+
 import {
   parseLibraryTokensFromUrl,
   useHandleLibrary,
@@ -73,6 +74,7 @@ import type {
 import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
+// Local components (runtime then local types)
 import CustomStats from "./CustomStats";
 import {
   Provider,
@@ -107,21 +109,17 @@ import { TopErrorBoundary } from "./components/TopErrorBoundary";
 import Login from "./components/Login";
 import LogoutButton from "./components/LogoutButton";
 import { supabase } from "./lib/supabaseClient";
-import type { Session, AuthChangeEvent, SupabaseClient } from "@supabase/supabase-js";
-
 import {
   exportToBackend,
   getCollaborationLinkData,
   isCollaborationLink,
   loadScene,
 } from "./data";
-
 import { updateStaleImageStatuses } from "./data/FileManager";
 import {
   importFromLocalStorage,
   importUsernameFromLocalStorage,
 } from "./data/localStorage";
-
 import { loadFilesFromFirebase } from "./data/firebase";
 import {
   LibraryIndexedDBAdapter,
@@ -142,10 +140,18 @@ import DebugCanvas, {
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 
+// Local types (including external type-only imports that must come after local runtime imports)
+// prettier-ignore
+// Styles (must come before external type-only imports to satisfy import/order)
 import "./index.scss";
 
+// Local & external type-only imports
+import type {
+  Session,
+  AuthChangeEvent,
+  SupabaseClient,
+} from "@supabase/supabase-js";
 import type { CollabAPI } from "./collab/Collab";
-
 
 polyfill();
 
@@ -1187,7 +1193,9 @@ const ExcalidrawApp = () => {
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    if (!supabase) return; // no-op if not configured
+    if (!supabase) {
+      return; // no-op if not configured
+    }
     const client: SupabaseClient = supabase; // narrowed
     (async () => {
       const { data } = await client.auth.getSession();

@@ -151,9 +151,6 @@ export const TTDDialogBase = withInternalFallback(
         setOnTextSubmitInProgess(true);
         trackEvent("ai", "generate", "ttd");
 
-        // 👉 Append diagram type to prompt
-        const finalPrompt = `[${diagramType}] ${prompt}`;
-
         const { generatedResponse, error, rateLimit, rateLimitRemaining } =
           await rest.onTextSubmit({ prompt, diagramType });
 

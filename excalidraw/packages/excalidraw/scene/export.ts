@@ -519,7 +519,10 @@ export const encodeSvgBase64Payload = ({
 };
 
 export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
-  if (svg.includes(`payload-type:${MIME_TYPES.excalidraw}`) || svg.includes(`payload-type:${MIME_TYPES.kroolo}`)) {
+  if (
+    svg.includes(`payload-type:${MIME_TYPES.excalidraw}`) ||
+    svg.includes(`payload-type:${MIME_TYPES.kroolo}`)
+  ) {
     const match = svg.match(
       /<!-- payload-start -->\s*(.+?)\s*<!-- payload-end -->/,
     );

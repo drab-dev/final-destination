@@ -280,6 +280,9 @@ export const LibraryMenu = memo(() => {
       theme={appState.theme}
       selectedItems={selectedItems}
       onSelectItems={setSelectedItems}
+      // Provide a minimal ExcalidrawImperativeAPI subset needed by custom
+      // library asset insertion (image add & scene update). We avoid exposing
+      // the full internal app instance.
     />
   );
 });

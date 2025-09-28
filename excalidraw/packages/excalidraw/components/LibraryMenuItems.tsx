@@ -1,6 +1,8 @@
 import React, { useRef } from "react";
 
-import { newTextElement } from "@excalidraw/element";
+import { newTextElement, newImageElement } from "@excalidraw/element";
+import { randomId, MIME_TYPES, viewportCoordsToSceneCoords } from "@excalidraw/common";
+import type { FileId } from "@excalidraw/element/types";
 
 import "./LibraryMenuItems.scss";
 
@@ -9,95 +11,98 @@ import type {
   LibraryItem,
   LibraryItems,
   UIAppState,
-  ExcalidrawImperativeAPI,
 } from "../types";
+import { useApp } from "./App";
 
-// Complete list of all JPG assets from the library-assets folder
+// Complete list of all SVG assets from the public/library-assets folder.
+// NOTE: Previously these pointed to .jpg (non-existent) which broke previews.
+// If you add new assets, ensure the filename (including spaces/case) matches exactly.
 const svgAssets = [
   {
     id: "4-ways",
     name: "4 Ways",
-    src: "/library-assets/4 Ways.jpg",
+    src: "/library-assets/4 Ways.svg",
   },
   {
     id: "ai-letters",
     name: "AI Letters",
-    src: "/library-assets/AI letters.jpg",
+    src: "/library-assets/AI letters.svg",
   },
   {
     id: "ai-wand",
     name: "AI Wand",
-    src: "/library-assets/AI Wand.jpg",
+    src: "/library-assets/AI Wand.svg",
   },
   {
     id: "anahata-flower",
     name: "Anahata Flower",
-    src: "/library-assets/Anahata~Flower.jpg",
+    src: "/library-assets/Anahata~Flower.svg",
   },
   {
     id: "bolt-flash",
     name: "Bolt Flash",
-    src: "/library-assets/Bolt flash.jpg",
+    src: "/library-assets/Bolt flash.svg",
   },
   {
     id: "burning-core",
     name: "Burning Core",
-    src: "/library-assets/Burning Core.jpg",
+    src: "/library-assets/Burning Core.svg",
   },
   {
     id: "butterfly-front",
     name: "Butterfly Front",
-    src: "/library-assets/Butterfly~ Front.jpg",
+    src: "/library-assets/Butterfly~ Front.svg",
   },
   {
     id: "butterfly-left",
     name: "Butterfly Left",
-    src: "/library-assets/Butterfly~ Left Side.jpg",
+    src: "/library-assets/Butterfly~ Left Side.svg",
   },
   {
     id: "butterfly-right",
     name: "Butterfly Right",
-    src: "/library-assets/Butterfly~ Right side.jpg",
+    src: "/library-assets/Butterfly~ Right side.svg",
   },
   {
     id: "calendar",
     name: "Calendar",
-    src: "/library-assets/calender.jpg",
+    // underlying file name is 'calender.svg' (sic)
+    src: "/library-assets/calender.svg",
   },
   {
     id: "celestial-body",
     name: "Celestial Body",
-    src: "/library-assets/Celestial body.jpg",
+    src: "/library-assets/Celestial body.svg",
   },
   {
     id: "cheese",
     name: "Cheese",
-    src: "/library-assets/Cheese.jpg",
+    src: "/library-assets/Cheese.svg",
   },
   {
     id: "chitti-robo",
     name: "Chitti Robo",
-    src: "/library-assets/Chitti Robo.jpg",
+    src: "/library-assets/Chitti Robo.svg",
   },
   {
     id: "circle-eye-smiley",
     name: "Circle Eye Smiley",
-    src: "/library-assets/Circle Eye Smiley.jpg",
+    src: "/library-assets/Circle Eye Smiley.svg",
   },
   {
     id: "cloud-basic",
     name: "Cloud Basic",
-    src: "/library-assets/Cloud Basic.jpg",
+    src: "/library-assets/Cloud Basic.svg",
   },
   {
     id: "colour-chart",
     name: "Colour Chart",
-    src: "/library-assets/Colour chart.jpg",
+    src: "/library-assets/Colour chart.svg",
   },
   {
     id: "delulu",
     name: "Delulu",
-    src: "/library-assets/delulu.jpg",
+    src: "/library-assets/delulu.svg",
   },
   {
     id: "disco",
@@ -397,7 +402,6 @@ export default function LibraryMenuItems({
   libraryReturnUrl,
   onSelectItems,
   selectedItems,
-  excalidrawAPI,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
@@ -409,68 +413,96 @@ export default function LibraryMenuItems({
   id: string;
   selectedItems: LibraryItem["id"][];
   onSelectItems: (id: LibraryItem["id"][]) => void;
-  excalidrawAPI?: ExcalidrawImperativeAPI;
 }) {
   const libraryContainerRef = useRef<HTMLDivElement>(null);
+  const app = useApp();
 
   const handleSvgClick = async (asset: typeof svgAssets[0]) => {
     try {
-      // Fetch the SVG file
+
+      // Fetch raw SVG text (prefer text for easier base64 encoding & normalization)
       const response = await fetch(asset.src);
-      const svgBlob = await response.blob();
-      
-      // Create a File object from the blob (this is what fileOpen returns)
-      const file = new File([svgBlob], `${asset.name}.svg`, {
-        type: "image/svg+xml",
-      });
-      
-      // Check if excalidrawAPI is available
-      if (excalidrawAPI) {
-        try {
-          // Get the canvas center coordinates
-          const appState = excalidrawAPI.getAppState();
-          const canvasCenter = {
-            clientX: appState.width / 2 + appState.offsetLeft,
-            clientY: appState.height / 2 + appState.offsetTop,
-          };
-          
-          // Trigger the image insertion by simulating the same flow
-          // Since insertImages is private, we'll create a custom drop event
-          const dropEvent = new DragEvent("drop", {
-            bubbles: true,
-            cancelable: true,
-            dataTransfer: new DataTransfer(),
-          });
-          
-          // Add the file to the drop event
-          dropEvent.dataTransfer?.items.add(file);
-          
-          // Set the position where the image should be dropped
-          Object.defineProperty(dropEvent, "clientX", {
-            value: canvasCenter.clientX,
-          });
-          Object.defineProperty(dropEvent, "clientY", {
-            value: canvasCenter.clientY,
-          });
-          
-          // Find the canvas element and dispatch the drop event
-          const canvasElement = document.querySelector(".excalidraw__canvas");
-          if (canvasElement) {
-            canvasElement.dispatchEvent(dropEvent);
-          } else {
-            console.error("Canvas element not found");
-            handleFallback(asset);
-          }
-        } catch (error) {
-          console.error("Error simulating drop:", error);
-          handleFallback(asset);
-        }
-      } else {
-        // Fallback: create a text element
-        handleFallback(asset);
+      if (!response.ok) {
+        throw new Error(`Failed to load SVG: ${response.status}`);
       }
+      const svgText = await response.text();
+
+      // Normalize basic SVG (strip potential XML declarations)
+      const normalized = svgText
+        .replace(/<\?xml[^>]*>/i, "")
+        .replace(/<!DOCTYPE[^>]*>/i, "")
+        .trim();
+
+      const encoded = btoa(unescape(encodeURIComponent(normalized)));
+      const dataURL = `data:${MIME_TYPES.svg};base64,${encoded}` as const;
+
+      // Prepare BinaryFileData compatible object
+      const fileId = randomId() as FileId;
+  app.addFiles([
+        {
+          id: fileId,
+            // mimeType narrowed to allowed svg
+          mimeType: MIME_TYPES.svg,
+          dataURL: dataURL as any,
+          created: Date.now(),
+        },
+      ]);
+
+      // Compute scene coords for canvas center
+  const appState = app.state;
+      const clientCenter = {
+        clientX: appState.width / 2 + appState.offsetLeft,
+        clientY: appState.height / 2 + appState.offsetTop,
+      };
+      const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
+        clientCenter,
+        appState,
+      );
+
+      // Load image element to determine natural size
+      const img = new Image();
+      const naturalDims: { width: number; height: number } = await new Promise(
+        (resolve, reject) => {
+          img.onload = () =>
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.onerror = (e) => reject(e);
+          img.src = dataURL;
+        },
+      );
+
+      // Scale down very large images similarly to App logic (rough heuristic)
+      const maxCanvasHeight = Math.max(appState.height - 120, 160);
+      const maxAllowed = Math.min(
+        maxCanvasHeight,
+        Math.floor(appState.height * 0.5) / appState.zoom.value,
+      );
+      let { width, height } = naturalDims;
+      if (height > maxAllowed) {
+        const ratio = width / height;
+        height = maxAllowed;
+        width = height * ratio;
+      }
+
+      const imageElement = newImageElement({
+        type: "image",
+        x: sceneX - width / 2,
+        y: sceneY - height / 2,
+        width,
+        height,
+        fileId,
+        status: "saved",
+        // ensure consistent scale default
+        scale: [1, 1],
+      });
+
+      (app as any).updateScene({
+        elements: [...app.scene.getNonDeletedElements(), imageElement],
+        appState: {
+          selectedElementIds: { [imageElement.id]: true },
+        } as any,
+      });
     } catch (error) {
-      console.error("Error handling SVG click:", error);
+      console.error("Error inserting SVG:", error);
       handleFallback(asset);
     }
   };

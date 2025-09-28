@@ -1,6 +1,29 @@
 @import "open-color/open-color";
 
 .excalidraw {
+  // Override sidebar height for library menu - make it 80% of screen height
+  // Target the sidebar when it contains the active library tab
+  .sidebar:has(.sidebar-tabs-root[data-value="library"]) {
+    top: 10% !important;
+    bottom: 10% !important;
+    height: 80% !important;
+  }
+
+  // Fallback approach for better browser compatibility
+  .default-sidebar .sidebar-tabs-root[data-value="library"] {
+    // This targets the tabs root, but we need to affect the parent sidebar
+    // We'll use a CSS custom property approach
+    --sidebar-height-override: 80%;
+  }
+
+  // Apply the height override when the custom property is set
+  .sidebar.default-sidebar:has(.sidebar-tabs-root[data-value="library"]),
+  .default-sidebar:has([data-value="library"]) .sidebar {
+    top: 10% !important;
+    bottom: 10% !important;
+    height: 80% !important;
+  }
+
   .layer-ui__library {
     display: flex;
     flex-direction: column;

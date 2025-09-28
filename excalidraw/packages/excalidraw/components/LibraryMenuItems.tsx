@@ -1,29 +1,6 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useRef } from "react";
 
-import { MIME_TYPES, arrayToMap } from "@excalidraw/common";
-
-import { duplicateElements } from "@excalidraw/element";
-
-import { serializeLibraryAsJSON } from "../data/json";
-import { useLibraryCache } from "../hooks/useLibraryItemSvg";
-import { useScrollPosition } from "../hooks/useScrollPosition";
-import { t } from "../i18n";
-
-import { LibraryMenuControlButtons } from "./LibraryMenuControlButtons";
-import { LibraryDropdownMenu } from "./LibraryMenuHeaderContent";
-import {
-  LibraryMenuSection,
-  LibraryMenuSectionGrid,
-} from "./LibraryMenuSection";
-
-import Spinner from "./Spinner";
-import Stack from "./Stack";
+import { newTextElement } from "@excalidraw/element";
 
 import "./LibraryMenuItems.scss";
 
@@ -32,14 +9,382 @@ import type {
   LibraryItem,
   LibraryItems,
   UIAppState,
+  ExcalidrawImperativeAPI,
 } from "../types";
 
-// using an odd number of items per batch so the rendering creates an irregular
-// pattern which looks more organic
-const ITEMS_RENDERED_PER_BATCH = 17;
-// when render outputs cached we can render many more items per batch to
-// speed it up
-const CACHED_ITEMS_RENDERED_PER_BATCH = 64;
+// Complete list of all JPG assets from the library-assets folder
+const svgAssets = [
+  {
+    id: "4-ways",
+    name: "4 Ways",
+    src: "/library-assets/4 Ways.jpg",
+  },
+  {
+    id: "ai-letters",
+    name: "AI Letters",
+    src: "/library-assets/AI letters.jpg",
+  },
+  {
+    id: "ai-wand",
+    name: "AI Wand",
+    src: "/library-assets/AI Wand.jpg",
+  },
+  {
+    id: "anahata-flower",
+    name: "Anahata Flower",
+    src: "/library-assets/Anahata~Flower.jpg",
+  },
+  {
+    id: "bolt-flash",
+    name: "Bolt Flash",
+    src: "/library-assets/Bolt flash.jpg",
+  },
+  {
+    id: "burning-core",
+    name: "Burning Core",
+    src: "/library-assets/Burning Core.jpg",
+  },
+  {
+    id: "butterfly-front",
+    name: "Butterfly Front",
+    src: "/library-assets/Butterfly~ Front.jpg",
+  },
+  {
+    id: "butterfly-left",
+    name: "Butterfly Left",
+    src: "/library-assets/Butterfly~ Left Side.jpg",
+  },
+  {
+    id: "butterfly-right",
+    name: "Butterfly Right",
+    src: "/library-assets/Butterfly~ Right side.jpg",
+  },
+  {
+    id: "calendar",
+    name: "Calendar",
+    src: "/library-assets/calender.jpg",
+  },
+  {
+    id: "celestial-body",
+    name: "Celestial Body",
+    src: "/library-assets/Celestial body.jpg",
+  },
+  {
+    id: "cheese",
+    name: "Cheese",
+    src: "/library-assets/Cheese.jpg",
+  },
+  {
+    id: "chitti-robo",
+    name: "Chitti Robo",
+    src: "/library-assets/Chitti Robo.jpg",
+  },
+  {
+    id: "circle-eye-smiley",
+    name: "Circle Eye Smiley",
+    src: "/library-assets/Circle Eye Smiley.jpg",
+  },
+  {
+    id: "cloud-basic",
+    name: "Cloud Basic",
+    src: "/library-assets/Cloud Basic.jpg",
+  },
+  {
+    id: "colour-chart",
+    name: "Colour Chart",
+    src: "/library-assets/Colour chart.jpg",
+  },
+  {
+    id: "delulu",
+    name: "Delulu",
+    src: "/library-assets/delulu.jpg",
+  },
+  {
+    id: "disco",
+    name: "Disco",
+    src: "/library-assets/Disco.svg",
+  },
+  {
+    id: "discount-flash",
+    name: "Discount Flash",
+    src: "/library-assets/Discount Flash.svg",
+  },
+  {
+    id: "discount-ticket",
+    name: "Discount Ticket",
+    src: "/library-assets/Discount Ticket.svg",
+  },
+  {
+    id: "discounted-item",
+    name: "Discounted Item",
+    src: "/library-assets/Discounted item.svg",
+  },
+  {
+    id: "droplet",
+    name: "Droplet",
+    src: "/library-assets/Droplet.svg",
+  },
+  {
+    id: "echo-flash",
+    name: "Echo Flash",
+    src: "/library-assets/Echo Flash.svg",
+  },
+  {
+    id: "eight-pointed-shuriken",
+    name: "Eight-Pointed Shuriken",
+    src: "/library-assets/Eight-Pointed Shuriken.svg",
+  },
+  {
+    id: "eye-swirl",
+    name: "Eye Swirl",
+    src: "/library-assets/Eye swirl.svg",
+  },
+  {
+    id: "figma",
+    name: "Figma",
+    src: "/library-assets/Figma.svg",
+  },
+  {
+    id: "fire-shield",
+    name: "Fire Shield",
+    src: "/library-assets/fire shield.svg",
+  },
+  {
+    id: "flash-fury",
+    name: "Flash Fury",
+    src: "/library-assets/Flash Fury.svg",
+  },
+  {
+    id: "fork-walk",
+    name: "Fork Walk",
+    src: "/library-assets/Fork walk.svg",
+  },
+  {
+    id: "four-ace",
+    name: "Four Ace",
+    src: "/library-assets/Four ace.svg",
+  },
+  {
+    id: "four-point-shuriken",
+    name: "Four-Point Shuriken",
+    src: "/library-assets/Four-Point Shuriken.svg",
+  },
+  {
+    id: "growth-tree",
+    name: "Growth Tree",
+    src: "/library-assets/growth tree.svg",
+  },
+  {
+    id: "half-moon-smiley",
+    name: "Half-Moon Smiley",
+    src: "/library-assets/Half-Moon Smiley.svg",
+  },
+  {
+    id: "halloween-cute-ghost",
+    name: "Halloween Cute Ghost",
+    src: "/library-assets/Halloween-CuteGhost.svg",
+  },
+  {
+    id: "halloween-pumpkin",
+    name: "Halloween Pumpkin",
+    src: "/library-assets/Halloween~Pumpkin.svg",
+  },
+  {
+    id: "heart-cut",
+    name: "Heart Cut",
+    src: "/library-assets/heart cut.svg",
+  },
+  {
+    id: "hour-glass",
+    name: "Hour Glass",
+    src: "/library-assets/Hour glass.svg",
+  },
+  {
+    id: "ice-tub",
+    name: "Ice Tub",
+    src: "/library-assets/Ice-Tub.svg",
+  },
+  {
+    id: "icecream",
+    name: "Ice Cream",
+    src: "/library-assets/Icecream.svg",
+  },
+  {
+    id: "icon-1",
+    name: "Icon 1",
+    src: "/library-assets/icon-1.svg",
+  },
+  {
+    id: "icon-2",
+    name: "Icon 2",
+    src: "/library-assets/icon-2.svg",
+  },
+  {
+    id: "inception",
+    name: "Inception",
+    src: "/library-assets/Inception.svg",
+  },
+  {
+    id: "jingles",
+    name: "Jingles",
+    src: "/library-assets/Jingles.svg",
+  },
+  {
+    id: "lantern",
+    name: "Lantern",
+    src: "/library-assets/Lantern.svg",
+  },
+  {
+    id: "lightning-offers",
+    name: "Lightning Offers",
+    src: "/library-assets/Lightning offers.svg",
+  },
+  {
+    id: "limited-deals",
+    name: "Limited Deals",
+    src: "/library-assets/Limited deals.svg",
+  },
+  {
+    id: "moon-walker",
+    name: "Moon Walker",
+    src: "/library-assets/moon walker.svg",
+  },
+  {
+    id: "music-ai",
+    name: "Music AI",
+    src: "/library-assets/Music AI.svg",
+  },
+  {
+    id: "orange",
+    name: "Orange",
+    src: "/library-assets/Orange.svg",
+  },
+  {
+    id: "palette",
+    name: "Palette",
+    src: "/library-assets/pallette.svg",
+  },
+  {
+    id: "palm-leaf",
+    name: "Palm Leaf",
+    src: "/library-assets/Palm Leaf.svg",
+  },
+  {
+    id: "peri-winkle",
+    name: "Periwinkle",
+    src: "/library-assets/peri Winkle.svg",
+  },
+  {
+    id: "popper",
+    name: "Popper",
+    src: "/library-assets/Popper.svg",
+  },
+  {
+    id: "poppy",
+    name: "Poppy",
+    src: "/library-assets/poppy.svg",
+  },
+  {
+    id: "power-button-smiley",
+    name: "Power Button Smiley",
+    src: "/library-assets/Power Button Smiley.svg",
+  },
+  {
+    id: "pushpak",
+    name: "Pushpak",
+    src: "/library-assets/pushpak.svg",
+  },
+  {
+    id: "rasen-shuriken",
+    name: "Rasen Shuriken",
+    src: "/library-assets/Rasen Shuriken.svg",
+  },
+  {
+    id: "rocketry",
+    name: "Rocketry",
+    src: "/library-assets/Rocketry.svg",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    src: "/library-assets/Rose.svg",
+  },
+  {
+    id: "shield",
+    name: "S.H.I.E.L.D",
+    src: "/library-assets/S.H.I.E.L.D.svg",
+  },
+  {
+    id: "shape-1",
+    name: "Shape 1",
+    src: "/library-assets/shape-1.svg",
+  },
+  {
+    id: "shape-2",
+    name: "Shape 2",
+    src: "/library-assets/shape-2.svg",
+  },
+  {
+    id: "shimmer-love",
+    name: "Shimmer Love",
+    src: "/library-assets/Shimmer love.svg",
+  },
+  {
+    id: "single-leaf",
+    name: "Single Leaf",
+    src: "/library-assets/Single~Leaf.svg",
+  },
+  {
+    id: "smile-please",
+    name: "Smile Please",
+    src: "/library-assets/Smile please.svg",
+  },
+  {
+    id: "sunriser",
+    name: "Sunriser",
+    src: "/library-assets/Sunriser.svg",
+  },
+  {
+    id: "target",
+    name: "Target",
+    src: "/library-assets/target.svg",
+  },
+  {
+    id: "textbox",
+    name: "TextBox",
+    src: "/library-assets/TextBox.svg",
+  },
+  {
+    id: "thunder-roar",
+    name: "Thunder Roar",
+    src: "/library-assets/Thunder Roar.svg",
+  },
+  {
+    id: "utility",
+    name: "Utility",
+    src: "/library-assets/utillity.svg",
+  },
+  {
+    id: "vikram-lander",
+    name: "Vikram Lander",
+    src: "/library-assets/Vikram lander.svg",
+  },
+  {
+    id: "wave-cloud",
+    name: "Wave Cloud",
+    src: "/library-assets/Wave Cloud(also croissant).svg",
+  },
+  {
+    id: "wide-eye",
+    name: "Wide Eye",
+    src: "/library-assets/wide eye.svg",
+  },
+  {
+    id: "winner",
+    name: "Winner",
+    src: "/library-assets/Winner.svg",
+  },
+];
 
 export default function LibraryMenuItems({
   isLoading,
@@ -52,6 +397,7 @@ export default function LibraryMenuItems({
   libraryReturnUrl,
   onSelectItems,
   selectedItems,
+  excalidrawAPI,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
@@ -63,289 +409,131 @@ export default function LibraryMenuItems({
   id: string;
   selectedItems: LibraryItem["id"][];
   onSelectItems: (id: LibraryItem["id"][]) => void;
+  excalidrawAPI?: ExcalidrawImperativeAPI;
 }) {
   const libraryContainerRef = useRef<HTMLDivElement>(null);
-  const scrollPosition = useScrollPosition<HTMLDivElement>(libraryContainerRef);
 
-  // This effect has to be called only on first render, therefore  `scrollPosition` isn't in the dependency array
-  useEffect(() => {
-    if (scrollPosition > 0) {
-      libraryContainerRef.current?.scrollTo(0, scrollPosition);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const { svgCache } = useLibraryCache();
-  const unpublishedItems = useMemo(
-    () => libraryItems.filter((item) => item.status !== "published"),
-    [libraryItems],
-  );
-
-  const publishedItems = useMemo(
-    () => libraryItems.filter((item) => item.status === "published"),
-    [libraryItems],
-  );
-
-  const showBtn = !libraryItems.length && !pendingElements.length;
-
-  const isLibraryEmpty =
-    !pendingElements.length &&
-    !unpublishedItems.length &&
-    !publishedItems.length;
-
-  const [lastSelectedItem, setLastSelectedItem] = useState<
-    LibraryItem["id"] | null
-  >(null);
-
-  const onItemSelectToggle = useCallback(
-    (id: LibraryItem["id"], event: React.MouseEvent) => {
-      const shouldSelect = !selectedItems.includes(id);
-
-      const orderedItems = [...unpublishedItems, ...publishedItems];
-
-      if (shouldSelect) {
-        if (event.shiftKey && lastSelectedItem) {
-          const rangeStart = orderedItems.findIndex(
-            (item) => item.id === lastSelectedItem,
-          );
-          const rangeEnd = orderedItems.findIndex((item) => item.id === id);
-
-          if (rangeStart === -1 || rangeEnd === -1) {
-            onSelectItems([...selectedItems, id]);
-            return;
-          }
-
-          const selectedItemsMap = arrayToMap(selectedItems);
-          const nextSelectedIds = orderedItems.reduce(
-            (acc: LibraryItem["id"][], item, idx) => {
-              if (
-                (idx >= rangeStart && idx <= rangeEnd) ||
-                selectedItemsMap.has(item.id)
-              ) {
-                acc.push(item.id);
-              }
-              return acc;
-            },
-            [],
-          );
-
-          onSelectItems(nextSelectedIds);
-        } else {
-          onSelectItems([...selectedItems, id]);
-        }
-        setLastSelectedItem(id);
-      } else {
-        setLastSelectedItem(null);
-        onSelectItems(selectedItems.filter((_id) => _id !== id));
-      }
-    },
-    [
-      lastSelectedItem,
-      onSelectItems,
-      publishedItems,
-      selectedItems,
-      unpublishedItems,
-    ],
-  );
-
-  const getInsertedElements = useCallback(
-    (id: string) => {
-      let targetElements;
-      if (selectedItems.includes(id)) {
-        targetElements = libraryItems.filter((item) =>
-          selectedItems.includes(item.id),
-        );
-      } else {
-        targetElements = libraryItems.filter((item) => item.id === id);
-      }
-      return targetElements.map((item) => {
-        return {
-          ...item,
-          // duplicate each library item before inserting on canvas to confine
-          // ids and bindings to each library item. See #6465
-          elements: duplicateElements({
-            type: "everything",
-            elements: item.elements,
-            randomizeSeed: true,
-          }).duplicatedElements,
-        };
+  const handleSvgClick = async (asset: typeof svgAssets[0]) => {
+    try {
+      // Fetch the SVG file
+      const response = await fetch(asset.src);
+      const svgBlob = await response.blob();
+      
+      // Create a File object from the blob (this is what fileOpen returns)
+      const file = new File([svgBlob], `${asset.name}.svg`, {
+        type: "image/svg+xml",
       });
-    },
-    [libraryItems, selectedItems],
-  );
-
-  const onItemDrag = useCallback(
-    (id: LibraryItem["id"], event: React.DragEvent) => {
-      event.dataTransfer.setData(
-        MIME_TYPES.excalidrawlib,
-        serializeLibraryAsJSON(getInsertedElements(id)),
-      );
-    },
-    [getInsertedElements],
-  );
-
-  const isItemSelected = useCallback(
-    (id: LibraryItem["id"] | null) => {
-      if (!id) {
-        return false;
+      
+      // Check if excalidrawAPI is available
+      if (excalidrawAPI) {
+        try {
+          // Get the canvas center coordinates
+          const appState = excalidrawAPI.getAppState();
+          const canvasCenter = {
+            clientX: appState.width / 2 + appState.offsetLeft,
+            clientY: appState.height / 2 + appState.offsetTop,
+          };
+          
+          // Trigger the image insertion by simulating the same flow
+          // Since insertImages is private, we'll create a custom drop event
+          const dropEvent = new DragEvent("drop", {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer: new DataTransfer(),
+          });
+          
+          // Add the file to the drop event
+          dropEvent.dataTransfer?.items.add(file);
+          
+          // Set the position where the image should be dropped
+          Object.defineProperty(dropEvent, "clientX", {
+            value: canvasCenter.clientX,
+          });
+          Object.defineProperty(dropEvent, "clientY", {
+            value: canvasCenter.clientY,
+          });
+          
+          // Find the canvas element and dispatch the drop event
+          const canvasElement = document.querySelector(".excalidraw__canvas");
+          if (canvasElement) {
+            canvasElement.dispatchEvent(dropEvent);
+          } else {
+            console.error("Canvas element not found");
+            handleFallback(asset);
+          }
+        } catch (error) {
+          console.error("Error simulating drop:", error);
+          handleFallback(asset);
+        }
+      } else {
+        // Fallback: create a text element
+        handleFallback(asset);
       }
+    } catch (error) {
+      console.error("Error handling SVG click:", error);
+      handleFallback(asset);
+    }
+  };
 
-      return selectedItems.includes(id);
-    },
-    [selectedItems],
-  );
+  // Fallback function for when SVG processing fails
+  const handleFallback = (asset: typeof svgAssets[0]) => {
+    const textElement = newTextElement({
+      x: 200,
+      y: 200,
+      text: `📎 ${asset.name}`,
+      fontSize: 16,
+      fontFamily: 1,
+      textAlign: "center",
+      verticalAlign: "middle",
+      strokeColor: "#1971c2",
+    });
 
-  const onAddToLibraryClick = useCallback(() => {
-    onAddToLibrary(pendingElements);
-  }, [pendingElements, onAddToLibrary]);
+    const libraryItem: LibraryItem = {
+      id: `fallback-${asset.id}-${Date.now()}`,
+      status: "published",
+      elements: [textElement],
+      created: Date.now(),
+      name: asset.name,
+    };
 
-  const onItemClick = useCallback(
-    (id: LibraryItem["id"] | null) => {
-      if (id) {
-        onInsertLibraryItems(getInsertedElements(id));
-      }
-    },
-    [getInsertedElements, onInsertLibraryItems],
-  );
-
-  const itemsRenderedPerBatch =
-    svgCache.size >= libraryItems.length
-      ? CACHED_ITEMS_RENDERED_PER_BATCH
-      : ITEMS_RENDERED_PER_BATCH;
+    onInsertLibraryItems([libraryItem]);
+  };
 
   return (
-    <div
-      className="library-menu-items-container"
-      style={
-        pendingElements.length ||
-        unpublishedItems.length ||
-        publishedItems.length
-          ? { justifyContent: "flex-start" }
-          : { borderBottom: 0 }
-      }
-    >
-      {!isLibraryEmpty && (
-        <LibraryDropdownMenu
-          selectedItems={selectedItems}
-          onSelectItems={onSelectItems}
-          className="library-menu-dropdown-container--in-heading"
-        />
-      )}
-      <Stack.Col
-        className="library-menu-items-container__items"
-        align="start"
-        gap={1}
-        style={{
-          flex: publishedItems.length > 0 ? 1 : "0 1 auto",
-          marginBottom: 0,
-        }}
+    <div className="library-menu-items-container">
+      <div
+        className="svg-assets-grid"
         ref={libraryContainerRef}
+        role="grid"
+        aria-label="SVG Assets Library"
       >
-        <>
-          {!isLibraryEmpty && (
-            <div className="library-menu-items-container__header">
-              {t("labels.personalLib")}
-            </div>
-          )}
-          {isLoading && (
-            <div
-              style={{
-                position: "absolute",
-                top: "var(--container-padding-y)",
-                right: "var(--container-padding-x)",
-                transform: "translateY(50%)",
-              }}
-            >
-              <Spinner />
-            </div>
-          )}
-          {!pendingElements.length && !unpublishedItems.length ? (
-            <div className="library-menu-items__no-items">
-              <div className="library-menu-items__no-items__label">
-                {t("library.noItems")}
-              </div>
-              <div className="library-menu-items__no-items__hint">
-                {publishedItems.length > 0
-                  ? t("library.hint_emptyPrivateLibrary")
-                  : t("library.hint_emptyLibrary")}
-              </div>
-            </div>
-          ) : (
-            <LibraryMenuSectionGrid>
-              {pendingElements.length > 0 && (
-                <LibraryMenuSection
-                  itemsRenderedPerBatch={itemsRenderedPerBatch}
-                  items={[{ id: null, elements: pendingElements }]}
-                  onItemSelectToggle={onItemSelectToggle}
-                  onItemDrag={onItemDrag}
-                  onClick={onAddToLibraryClick}
-                  isItemSelected={isItemSelected}
-                  svgCache={svgCache}
-                />
-              )}
-              <LibraryMenuSection
-                itemsRenderedPerBatch={itemsRenderedPerBatch}
-                items={unpublishedItems}
-                onItemSelectToggle={onItemSelectToggle}
-                onItemDrag={onItemDrag}
-                onClick={onItemClick}
-                isItemSelected={isItemSelected}
-                svgCache={svgCache}
-              />
-            </LibraryMenuSectionGrid>
-          )}
-        </>
-
-        <>
-          {(publishedItems.length > 0 ||
-            pendingElements.length > 0 ||
-            unpublishedItems.length > 0) && (
-            <div className="library-menu-items-container__header library-menu-items-container__header--excal">
-              {t("labels.excalidrawLib")}
-            </div>
-          )}
-          {publishedItems.length > 0 ? (
-            <LibraryMenuSectionGrid>
-              <LibraryMenuSection
-                itemsRenderedPerBatch={itemsRenderedPerBatch}
-                items={publishedItems}
-                onItemSelectToggle={onItemSelectToggle}
-                onItemDrag={onItemDrag}
-                onClick={onItemClick}
-                isItemSelected={isItemSelected}
-                svgCache={svgCache}
-              />
-            </LibraryMenuSectionGrid>
-          ) : unpublishedItems.length > 0 ? (
-            <div
-              style={{
-                margin: "1rem 0",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                fontSize: ".9rem",
-              }}
-            >
-              {t("library.noItems")}
-            </div>
-          ) : null}
-        </>
-
-        {showBtn && (
-          <LibraryMenuControlButtons
-            style={{ padding: "16px 0", width: "100%" }}
-            id={id}
-            libraryReturnUrl={libraryReturnUrl}
-            theme={theme}
+        {svgAssets.map((asset) => (
+          <div
+            key={asset.id}
+            className="svg-asset-item"
+            role="gridcell"
+            tabIndex={0}
+            aria-label={`${asset.name} asset`}
+            onClick={() => handleSvgClick(asset)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleSvgClick(asset);
+              }
+            }}
           >
-            <LibraryDropdownMenu
-              selectedItems={selectedItems}
-              onSelectItems={onSelectItems}
-            />
-          </LibraryMenuControlButtons>
-        )}
-      </Stack.Col>
+            <div className="svg-asset-preview">
+              <img
+                src={asset.src}
+                alt={asset.name}
+                className="svg-asset-image"
+                loading="lazy"
+              />
+            </div>
+            <div className="svg-asset-name">{asset.name}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
